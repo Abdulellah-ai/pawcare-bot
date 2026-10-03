@@ -177,7 +177,7 @@ const c = $('Ctx').first().json; return [{ json: { method: 'editForumTopic', pay
 }
 
 // How long a conversation may stay with a human (no message from either side) before it returns to the bot on its own.
-const IDLE_HANDOFF_HOURS = 6;
+const IDLE_HANDOFF_HOURS = 2;
 
 /** PawCare_IdleHandoff — runs every 10 minutes (and can be called as a sub-workflow for tests).
  *  A conversation left "with a human" and silent for IDLE_HANDOFF_HOURS goes back to the bot, so a forgotten /close never leaves a customer without answers.
