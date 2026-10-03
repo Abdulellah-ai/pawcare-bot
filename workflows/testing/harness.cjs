@@ -5,7 +5,7 @@ const path = require('path');
 const { api, BASE, cleanSettings } = require('../../tools/n8n-api.cjs');
 
 async function callWorkflow(key, body, { timeoutMs = 90000 } = {}) {
-  const ids = JSON.parse(fs.readFileSync(path.join(__dirname, '../../.local/workflow-ids.json'), 'utf8'));
+  const ids = JSON.parse(fs.readFileSync(path.join(__dirname, process.env.N8N_CONFIG ? '../../.local/workflow-ids.new.json' : '../../.local/workflow-ids.json'), 'utf8'));
   if (!ids[key]) throw new Error('unknown workflow key ' + key);
   const hook = `pawcare-test-${key}-${Date.now()}`;
   const wf = {

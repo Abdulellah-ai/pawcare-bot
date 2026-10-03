@@ -76,6 +76,9 @@ const want = norm($('Prepare text').first().json.input).filter((x) => !/\d/.test
   said = new Set(norm(a.transcript));
 const overlap = want.length ? want.filter((w) => said.has(w)).length / want.length : 0;
 if (overlap < 0.7) throw new Error('tts spoke different words (overlap ' + overlap.toFixed(2) + ')');
+// also reject EXTRA speech (e.g. the model announcing "I will read the text literally:" before the sentence); a few extra words are normal (numbers spoken as words)
+const wantAll = new Set(norm($('Prepare text').first().json.input)), extra = [...said].filter((w) => !wantAll.has(w)).length;
+if (extra > Math.max(3, Math.round(said.size * 0.3))) throw new Error('tts added extra words (' + extra + ' of ' + said.size + ')');
 const bin = await this.helpers.prepareBinaryData(Buffer.from(a.data, 'base64'), 'reply.ogg', 'audio/ogg');
 return [{ json: { method: 'sendVoice', multipart: true, chat_id: $('Prepare text').first().json.chat_id }, binary: { data: bin } }];`);
   N.call(wf, 'Send voice', 'tgRaw');

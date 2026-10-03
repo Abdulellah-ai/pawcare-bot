@@ -52,7 +52,7 @@ const steps = {
     const hook = 'pawcare-preflight-' + Date.now();
     const wf = { name: 'PawCare_TEST_preflight', settings: { executionOrder: 'v1' }, nodes: [
       { id: 'a1', name: 'Webhook', type: 'n8n-nodes-base.webhook', typeVersion: 2, position: [0, 0], webhookId: hook, parameters: { httpMethod: 'POST', path: hook, responseMode: 'lastNode', options: {} } },
-      { id: 'a2', name: 'Out', type: 'n8n-nodes-base.code', typeVersion: 2, position: [240, 0], parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "return [{ json: { ok: true, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, node: process.version } }];" } },
+      { id: 'a2', name: 'Out', type: 'n8n-nodes-base.code', typeVersion: 2, position: [240, 0], parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "return [{ json: { ok: true, tz: Intl.DateTimeFormat().resolvedOptions().timeZone } }];" } },
     ], connections: { Webhook: { main: [[{ node: 'Out', type: 'main', index: 0 }]] } } };
     const c = await nw('POST', '/api/v1/workflows', wf);
     try {
