@@ -176,4 +176,41 @@ const c = $('Ctx').first().json; return [{ json: { method: 'editForumTopic', pay
   return wf;
 }
 
-module.exports = { openHandoff, staffRelay, HTML_ESC, REASON_AR };
+// How long a conversation may stay with a human (no message from either side) before it returns to the bot on its own.
+const IDLE_HANDOFF_HOURS = 6;
+
+/** PawCare_IdleHandoff — runs every 10 minutes (and can be called as a sub-workflow for tests).
+ *  A conversation left "with a human" and silent for IDLE_HANDOFF_HOURS goes back to the bot, so a forgotten /close never leaves a customer without answers.
+ *  One conversation per run keeps it simple and safe; the schedule drains any backlog. */
+function idleHandoff() {
+  const wf = new WF('PawCare_IdleHandoff');
+  N.trigger(wf, 'Trigger');
+  wf.add('Every 10 min', 'n8n-nodes-base.scheduleTrigger', 1.2, { rule: { interval: [{ field: 'minutes', minutesInterval: 10 }] } });
+  N.pg(wf, 'Close idle', `
+with idle as (
+  select c.id as conversation_id, c.staff_topic_id, cu.first_name, h.id as handoff_id, h.reason, h.summary
+  from public.conversations c
+  join public.customers cu on cu.id = c.customer_id
+  join lateral (select id, reason, summary from public.handoffs where conversation_id = c.id and status in ('open','taken') order by created_at desc limit 1) h on true
+  where c.status = 'handoff' and c.deleted_at is null and c.staff_topic_id is not null and c.last_message_at < now() - interval '${IDLE_HANDOFF_HOURS} hours'
+  order by c.last_message_at limit 1
+), cv as (update public.conversations set status = 'bot', last_message_at = now() where id in (select conversation_id from idle) returning id),
+   h as (update public.handoffs set status = 'resolved', resolved_at = now() where id in (select handoff_id from idle) returning id)
+select i.* from idle i`);
+  N.iff(wf, 'Has topic?', '={{ !!$json.staff_topic_id }}');
+  N.code(wf, 'Rename idle request', `${inline('topicname.js')}
+const c = $('Close idle').first().json; return [{ json: { method: 'editForumTopic', payload: { chat_id: ${STAFF_GROUP}, message_thread_id: Number(c.staff_topic_id), name: topicName('✅', c.reason, c.first_name, c.summary) } } }];`);
+  N.call(wf, 'Rename idle', 'tgRaw');
+  N.code(wf, 'Note request', `const c = $('Close idle').first().json; return [{ json: { method: 'sendMessage', payload: { chat_id: ${STAFF_GROUP}, message_thread_id: Number(c.staff_topic_id), text: '⏱️ أُغلقت هذه المحادثة تلقائيًا لعدم وجود نشاط منذ ${IDLE_HANDOFF_HOURS} ساعات. عاد البوت يرد على العميل، وإن راسل العميل مجددًا بطلب موظف فسيُفتح الموضوع من جديد.' } } }];`);
+  N.call(wf, 'Post note', 'tgRaw');
+  N.code(wf, 'Close idle topic request', `return [{ json: { method: 'closeForumTopic', payload: { chat_id: ${STAFF_GROUP}, message_thread_id: Number($('Close idle').first().json.staff_topic_id) } } }];`);
+  N.call(wf, 'Close idle topic', 'tgRaw');
+  wf.link('Trigger', 'Close idle');
+  wf.link('Every 10 min', 'Close idle');
+  wf.chain('Close idle', 'Has topic?');
+  wf.link('Has topic?', 'Rename idle request', 0);
+  wf.chain('Rename idle request', 'Rename idle', 'Note request', 'Post note', 'Close idle topic request', 'Close idle topic');
+  return wf;
+}
+
+module.exports = { openHandoff, staffRelay, idleHandoff, IDLE_HANDOFF_HOURS, HTML_ESC, REASON_AR };

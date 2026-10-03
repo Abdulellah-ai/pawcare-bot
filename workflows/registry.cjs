@@ -1,7 +1,7 @@
 // Single list of PawCare workflows. Order matters: dependencies first. `errorWf` = point errorWorkflow at PawCare_ErrorHandler.
 const { tgRaw, verifyHmac } = require('./defs/vault.cjs');
 const { transcribe, speak } = require('./defs/voice.cjs');
-const { openHandoff, staffRelay } = require('./defs/handoff.cjs');
+const { openHandoff, staffRelay, idleHandoff } = require('./defs/handoff.cjs');
 const { customerTurn } = require('./defs/customer.cjs');
 const { ingress } = require('./defs/ingress.cjs');
 const { adminAssist, health } = require('./defs/ops.cjs');
@@ -16,6 +16,7 @@ module.exports = [
   { key: 'speak', build: speak, errorWf: true, activate: true },
   { key: 'openHandoff', build: openHandoff, errorWf: true, activate: true },
   { key: 'staffRelay', build: staffRelay, errorWf: true, activate: true },
+  { key: 'idleHandoff', build: idleHandoff, errorWf: true, activate: true },
   { key: 'customerTurn', build: customerTurn, errorWf: true, activate: true },
   // Ingress last: activating it registers the Telegram webhook, so everything it calls must already exist.
   { key: 'ingress', build: ingress, errorWf: true, activate: true },
