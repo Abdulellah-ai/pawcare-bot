@@ -100,6 +100,9 @@ function health() {
   N.pg(wf, 'Sweep', `with s as (
   update public.inbound_updates set status = 'failed', error = 'stuck_timeout'
   where status in ('received','processing') and received_at < now() - interval '4 minutes' returning update_id, customer_id, received_at
+), scrub as (
+  -- PII retention: an abandoned booking draft (it holds a phone number) is erased after its TTL
+  update public.conversations set booking_draft = null, booking_draft_at = null where booking_draft_at < now() - interval '48 hours' returning id
 )
 select s.update_id, c.telegram_user_id as chat_id from s join public.customers c on c.id = s.customer_id
 where s.received_at > now() - interval '2 hours'`, null, { alwaysOutputData: true });
