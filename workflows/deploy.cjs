@@ -4,11 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const { api, cleanSettings } = require('../tools/n8n-api.cjs');
 
-const env = Object.fromEntries(fs.readFileSync(path.join(__dirname, '../.local/secrets.env'), 'utf8').split(/\r?\n/).filter(Boolean).map((l) => { const i = l.indexOf('='); return [l.slice(0, i), l.slice(i + 1)]; }));
+const env = Object.fromEntries(fs.readFileSync(process.env.PAWCARE_SECRETS || path.join(__dirname, '../.local/secrets.env'), 'utf8').split(/\r?\n/).filter(Boolean).map((l) => { const i = l.indexOf('='); return [l.slice(0, i), l.slice(i + 1)]; }));
 const registry = require('./registry.cjs');
 
 const args = process.argv.slice(2);
 const dry = args.includes('--dry');
+// PAWCARE_HOLD=ingress,health -> deploy those workflows but leave them inactive (used to stage on a new server before cutover)
+const HOLD = (process.env.PAWCARE_HOLD || '').split(',').filter(Boolean);
 const tagOnly = args.includes('--tag-only');
 const only = args.filter((a) => !a.startsWith('--'));
 const TAG = 'PawCare';
@@ -73,8 +75,8 @@ function validate(wf) {
     }
     ids[r.key] = id;
     await tagWorkflow(id, tagId);
-    if (r.activate) await api('POST', `/api/v1/workflows/${id}/activate`);
-    console.log(`${found ? 'updated' : 'created'} ${payload.name} (${id})${r.activate ? ' [active]' : ''}`);
+    if (r.activate && !HOLD.includes(r.key)) await api('POST', `/api/v1/workflows/${id}/activate`);
+    console.log(`${found ? 'updated' : 'created'} ${payload.name} (${id})${r.activate && !HOLD.includes(r.key) ? ' [active]' : (HOLD.includes(r.key) ? ' [held inactive]' : '')}`);
   }
-  if (!dry) fs.writeFileSync(path.join(__dirname, '../.local/workflow-ids.json'), JSON.stringify(ids, null, 2));
+  if (!dry) fs.writeFileSync(path.join(__dirname, process.env.N8N_CONFIG ? '../.local/workflow-ids.new.json' : '../.local/workflow-ids.json'), JSON.stringify(ids, null, 2));
 })().catch((e) => { console.error('ERR', e.message.slice(0, 900)); process.exit(1); });

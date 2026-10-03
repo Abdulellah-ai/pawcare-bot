@@ -1,6 +1,7 @@
 // Thin n8n REST helper. Reads BASE_URL/API_KEY at runtime (ngrok URL rotates) - never hardcode.
 const fs = require('fs');
-const CFG = 'C:/Users/user/المسار النهائي لتحليل البيانات/.local/n8n.txt';
+// N8N_CONFIG=<file> points every tool (deploy, tests) at another n8n (e.g. the new VPS) without touching the default.
+const CFG = process.env.N8N_CONFIG || 'C:/Users/user/المسار النهائي لتحليل البيانات/.local/n8n.txt';
 const cfg = fs.readFileSync(CFG, 'utf8');
 const pick = (k) => (cfg.split(k + '=')[1] || '').split(/\r?\n/)[0].trim();
 const BASE = pick('BASE_URL');
