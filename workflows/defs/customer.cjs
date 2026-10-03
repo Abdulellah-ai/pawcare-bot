@@ -2,6 +2,8 @@ const { WF, N, CRED, inline } = require('../lib/dsl.cjs');
 const { STAFF_GROUP, TOPIC_BOOKINGS } = require('./errors.cjs');
 
 const MODEL = 'gpt-6-luna';
+// Silence longer than this starts a new conversation session for the model (see 'Load history'); matches the idle auto-return window of a handoff.
+const SESSION_GAP_HOURS = 2;
 const RATE_LIMIT_PER_MIN = 15; // ASSUMPTION (reference lesson: thresholds are guesses until measured). Revisit with real traffic.
 const MAX_VOICE_SECONDS = 60; // voice reference: 30-60s cap
 const C = (n) => `$('${n}').first().json`;
@@ -127,8 +129,18 @@ return [{ json: { ...c, decision: { source: 'rules', reply: EMERGENCY_REPLY[lang
   handoff: { needed: true, reason: 'emergency', summary: 'طارئ (' + (c.emergency_categories || []).join('، ') + '): ' + String(c.text).slice(0, 220) }, booking: null } } }];`);
 
   N.pg(wf, 'Load config', `select jsonb_object_agg(kind, content) as cfg, jsonb_object_agg(kind, version) as ver from public.bot_config_versions where status = 'active'`);
-  N.pg(wf, 'Load history', `select coalesce(jsonb_agg(jsonb_build_object('s', sender, 'b', body) order by created_at), '[]'::jsonb) as h
-from (select sender, body, created_at from public.messages where conversation_id = $1::uuid order by created_at desc limit 11) x`,
+  // The model's memory is the CURRENT SESSION only: it starts after the last handoff closure and after any silence longer than SESSION_GAP_HOURS (staff messages count as activity),
+  // and contains only the customer's and the bot's own messages (a staff reply must never look like something the bot said).
+  N.pg(wf, 'Load history', `with msgs as (
+  select sender, body, created_at, lag(created_at) over (order by created_at) as prev from public.messages where conversation_id = $1::uuid
+), gap as (select max(created_at) as t from msgs where prev is not null and created_at - prev > interval '${SESSION_GAP_HOURS} hours'),
+   closed as (select max(resolved_at) as t from public.handoffs where conversation_id = $1::uuid and resolved_at is not null)
+select coalesce(jsonb_agg(jsonb_build_object('s', sender, 'b', body) order by created_at), '[]'::jsonb) as h
+from (select sender, body, created_at from msgs
+      where sender in ('customer', 'bot')
+        and created_at >= coalesce((select t from gap), '-infinity'::timestamptz)
+        and created_at > coalesce((select t from closed), '-infinity'::timestamptz)
+      order by created_at desc limit 11) x`,
     `={{ [${C('Ctx2')}.conversation_id] }}`);
 
   N.code(wf, 'Build request', `${inline('prompts.js')}
