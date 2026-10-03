@@ -1,0 +1,13 @@
+# secrets and local-only files
+.local/
+.env
+.env.*
+*.env
+dashboard/.dev.vars
+# build output and dependencies
+node_modules/
+.next/
+.open-next/
+.wrangler/
+pawcare-dash-build/
+*.log
