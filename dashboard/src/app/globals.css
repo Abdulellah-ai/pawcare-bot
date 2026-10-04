@@ -87,7 +87,8 @@
   --font-sans: var(--font-tajawal), "Segoe UI", Tahoma, system-ui, sans-serif;
 }
 
-html { background: var(--bg); }
+html { background: var(--bg); overflow-x: clip; }
+body { overflow-x: clip; }
 body {
   background: var(--bg);
   color: var(--fg);
