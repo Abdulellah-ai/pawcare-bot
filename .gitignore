@@ -11,3 +11,6 @@ node_modules/
 .wrangler/
 pawcare-dash-build/
 *.log
+
+# keep the template
+!.env.example
